@@ -1,43 +1,25 @@
-/* 
- * Arduino: 1.6.13 (Linux), Board: "Arduino/Genuino Micro"
- *  Code to control the mouse pointer
- * through the movement of the head
- * Change values at vx and vy (+300 and -100 in my case)
- * using the TEST code to make your project work.
- * 
- * Gabry295
- * keycode 113 press
-  keycode 113 release // MUTE for ubuntu 
-  keycode 114 press
-  keycode 114 release // volume DOwn
-  keycode 115 press
-  keycode 115 release // Volume up 
-
-
-
- */
- // Keyboard.press(byte)......Keyboard.release(byte)
- //Keyboard.print(string) .......Keyboard.println(string)
- //Keyboard.write(char).....Keyboard.write(char)
+#define TRUE true
+#define FALSE false
 
 #include <Wire.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
+#include "HID-Project.h" //by NicoHood V2.8.2 from arduino library manager 
 
-#include "HID-Project.h"
+#define DEBUG TRUE //make TRUE to enable serial output and FALSE to disable
 
 MPU6050 mpu;
 int16_t ax, ay, az, gx, gy, gz;
-int16_t vx, vy, vx_prec , vy_prec;  //, gx, gy, gx_prec , gy_prec ;
+int16_t vx, vy;
 double angle_pitch_output, angle_roll_output , prev_angle_roll;
 int enable_cursor = 16;
 int left_click = 9;
+int Volume_CONTROL =10;
 int mouseClickFlag =0;
-int counting = 0;
-boolean  Increase;
 void setup() {
   pinMode(enable_cursor, INPUT_PULLUP);
   pinMode(left_click , INPUT_PULLUP);
+  pinMode(Volume_CONTROL , INPUT_PULLUP);
   Serial.begin(9600);
   Wire.begin();
   Mouse.begin();
@@ -51,140 +33,65 @@ void setup() {
 
 void loop() 
 {
-
-
-  if (digitalRead(enable_cursor) == 0)
-  {
-     
-         if ( (vx_prec-2)<=vx && vx<=vx_prec+2 && (vy_prec-2)<=vy && vy<=vy_prec+2) 
-         {
-             mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-                vx = (gx+300)/200;
-                vy = -(gz-100)/200;
-              Mouse.move(vy, vx);
-              Serial.println("MOUSE MOVE ");
-         }
-         
-       {  
-         
-             if ((digitalRead(left_click) == 0) && (!mouseClickFlag)) 
-                {
-                  mouseClickFlag = 1;
-                  Mouse.press(MOUSE_LEFT);  
-                }
-                
-              else if ((digitalRead(left_click))&&(mouseClickFlag))
-                {
-                  mouseClickFlag = 0;
-                  Mouse.release(MOUSE_LEFT);  
-                }
-
-       }
-          
-      vx_prec = vx; 
-      vy_prec = vy;
-
-
-  }
-
-   //   if ((digitalRead(left_click) == 0) && (!mouseClickFlag) ) 
-   if ((digitalRead(left_click) == 0)&& (digitalRead(enable_cursor) == 1) ) 
-                {
-                     //Roll = atan2 (Y, Z) * (180 / PI)
-                         angle_roll_output = atan2(double(ay) , double(az)) *double(180/3.14159);
-                    // Pitch = atan2 (X, sqrt((Y*Y) + (Z*Z))) * (180 / PI
-                    if (abs((prev_angle_roll - angle_roll_output)) >= 10)
-                    {
-                          if((prev_angle_roll) < (angle_roll_output) )
-                              {
-                                Consumer.write(MEDIA_VOLUME_DOWN);
-                                delayMicroseconds(30);
-                                Consumer.write(MEDIA_VOLUME_DOWN);  // Volume Up`````
-                                   
-                                        
-                              }
-                          if((prev_angle_roll) > (angle_roll_output))
-                           {
-                               Consumer.write(MEDIA_VOLUME_UP);
-                               delayMicroseconds(30);
-                               Consumer.write(MEDIA_VOLUME_UP);  // Volume Up`````
-                                         
-                           }
-                      prev_angle_roll = angle_roll_output;
-                    }
-                }
-                
-  
-             
-    else if (digitalRead(left_click) == 1)
-                {
-                }
-                
-  if ((digitalRead(left_click))&&(mouseClickFlag))
-              {
-                mouseClickFlag = 0;
-                Mouse.release(MOUSE_LEFT);  
-              }
+  if (digitalRead(enable_cursor) == LOW)
+    {    
+       mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+       vx = -(gx+350)/300;  
+       vy = -(gz-100)/250; 
+       if(vy >= -1 && vy <= (1)) { vy = 0; }
+       if(vx >= -1 && vx <= (1)) { vx = 0; }
+       #if(DEBUG == TRUE)
+       Serial.print("  vx : ");
+       Serial.print(vx);
+       Serial.print("  vy : ");
+       Serial.println(vy);
+       #endif
+       Mouse.move(vy, vx);  
+    }
+  else
+    {
+      /*Do nothing */
+    }
+  if ((digitalRead(left_click) == LOW)) 
+    {   
+       Mouse.press(MOUSE_LEFT); 
+       delayMicroseconds(10); 
+    }
+  else
+    {
+        Mouse.release(MOUSE_LEFT);
+       delayMicroseconds(10);  
+    } 
+  if (digitalRead(Volume_CONTROL) == LOW)
+    {
       mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-      angle_roll_output = atan2(double(ay), double(az)) *double(180/3.14159);
-      Serial.println(abs(angle_roll_output ));
-
+      angle_roll_output = atan2(double(ay) , double(az)) *double(180/3.14159);
+      if (abs((prev_angle_roll - angle_roll_output)) >= (10))
+         {
+           if((prev_angle_roll) < (angle_roll_output) )
+             {
+               Consumer.write(MEDIA_VOLUME_DOWN);
+               delayMicroseconds(20);
+               Consumer.write(MEDIA_VOLUME_DOWN);  // Volume DOWN
+               delayMicroseconds(20);
+             }
+           else if((prev_angle_roll) > (angle_roll_output))
+             {
+               Consumer.write(MEDIA_VOLUME_UP);
+               delayMicroseconds(20);
+               Consumer.write(MEDIA_VOLUME_UP);  // Volume UP
+               delayMicroseconds(20);
+             }
+             else
+             {
+              /*Do nothing */
+             }
+            prev_angle_roll = angle_roll_output;
+         }
+    }
+  else
+    {
+      /*Do nothing */                
+    }
+    delay(5);
 }
-//
-//  if (digitalRead(enable_cursor) == 0)
-//  {
-//     
-//         if ( (vx_prec-2)<=vx && vx<=vx_prec+2 && (vy_prec-2)<=vy && vy<=vy_prec+2) 
-//         {
-//             mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-//      
-//               vx = (gx+300)/200;  // "+300" because the x axis of gyroscope give values about -350 while it's not moving. Change this value if you get something different using the TEST code, chacking if there are values far from zero.
-//               vy = -(gz-100)/200; // same here about "-100"
-//      
-//              Mouse.move(vy, vx);
-//         }
-//         
-//       {  
-//         
-//             if ((digitalRead(left_click) == 0) && (!mouseClickFlag)) 
-//                {
-//                  mouseClickFlag = 1;
-//                  Mouse.press(MOUSE_LEFT);  
-//                }
-//                
-//              else if ((digitalRead(left_click))&&(mouseClickFlag))
-//                {
-//                  mouseClickFlag = 0;
-//                  Mouse.release(MOUSE_LEFT);  
-//                }
-//
-//       }
-//          
-//      vx_prec = vx; 
-//      vy_prec = vy;
-//
-//
-//  }
-//   
-//   if ((digitalRead(left_click) == 0) && (!mouseClickFlag) ) 
-//                {
-//
-//                        mouseClickFlag = 1;
-//                       // Mouse.press(MOUSE_LEFT);
-//                        Consumer.write(MEDIA_VOLUME_UP);
-//                        delay(10);
-//                        Consumer.write(MEDIA_VOLUME_UP);// Volume Up``````
-//                       //Keyboard.releaseAll();
-//                       
-//
-//                }
-//                
-//  
-//                
-//    else if ((digitalRead(left_click))&&(mouseClickFlag))
-//                {
-//                  mouseClickFlag = 0;
-//                 //Keyboard.releaseAll();
-//                  //Mouse.release(MOUSE_LEFT);  
-//                }
-
